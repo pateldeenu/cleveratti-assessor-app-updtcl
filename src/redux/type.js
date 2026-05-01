@@ -1,0 +1,39 @@
+// export const IS_LOADING = "IS_LOADING";
+// export const GET_ALL_LIST = "GET_ALL_LIST";
+// export const GET_DETAILS = "GET_DETAILS";
+// export const IS_AUTH = "IS_AUTH";
+// export const API = "API";
+// export const SET_ACTIVE_TAB = "SET_ACTIVE_TAB";
+// export const UPDATE_CALLBACK = "UPDATE_CALLBACK";
+// export const SEARCH_TEXT = "SEARCH_TEXT";
+// export const SEARCH_TEXT_FAVORITE = "SEARCH_TEXT_FAVORITE";
+// export const BOTTOM_SEARCH_TEXT = "BOTTOM_SEARCH_TEXT";
+// export const SEARCH_TEXT_WORKING = "SEARCH_TEXT_WORKING";
+// export const SEARCH_DATA = "SEARCH_DATA";
+// export const CAN_ATTEMPTED_DATA = false;
+// export const ARTICLES_DATA = "ARTICLES_DATA";
+// export const SAVE_USER = "SAVE_USER";
+// export const SCREEN_HIEGHT = "SCREEN_HIEGHT";
+// export const GET_PROFILE = "GET_PROFILE";
+// export const LAT_LONG = "LAT_LONG";
+
+
+export const IS_LOADING = "IS_LOADING";
+export const GET_ALL_LIST = "GET_ALL_LIST";
+export const GET_DETAILS = "GET_DETAILS";
+export const IS_AUTH = "IS_AUTH";
+export const API = "API";
+export const SET_ACTIVE_TAB = "SET_ACTIVE_TAB";
+export const UPDATE_CALLBACK = "UPDATE_CALLBACK";
+export const SEARCH_TEXT = "SEARCH_TEXT";
+export const SEARCH_TEXT_FAVORITE = "SEARCH_TEXT_FAVORITE";
+export const BOTTOM_SEARCH_TEXT = "BOTTOM_SEARCH_TEXT";
+export const SEARCH_TEXT_WORKING = "SEARCH_TEXT_WORKING";
+export const SEARCH_DATA = "SEARCH_DATA";
+export const CAN_ATTEMPTED_DATA = "CAN_ATTEMPTED_DATA"; // ✅ Fixed
+export const ARTICLES_DATA = "ARTICLES_DATA";
+export const SAVE_USER = "SAVE_USER";
+export const SCREEN_HIEGHT = "SCREEN_HIEGHT";
+export const GET_PROFILE = "GET_PROFILE";
+export const LAT_LONG = "LAT_LONG";
+
