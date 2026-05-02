@@ -9,15 +9,13 @@ import {
   Alert,
   Modal,
   TouchableOpacity,
-  Button,
   BackHandler,
   PermissionsAndroid,
   StyleSheet,
   Platform,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
-import { COLORS, FONTS, SIZES } from "../../constants/Theme";
-import NoData from "../../components/Nodata";
+import { COLORS } from "../../constants/Theme";
 import normalize from "react-native-normalize";
 import VivaLiveStreaming from "./VivaLiveSreaming/VivaLiveStreaming";
 import {
@@ -36,6 +34,7 @@ import { uploadVideoTagApi, postSubmitQuestinApi } from "../../redux/Actions/All
 import { timeDateFormate, getData, } from "../../utils/Utills";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useFocusEffect, CommonActions } from '@react-navigation/native';
+import CustomLoader from "../../components/CustomLoader ";
 
 const StartVivaVideoRecording = ({ navigation, route }) => {
   const {
@@ -85,13 +84,11 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
   const [isGenderVisible, setIsGenderVisible] = useState(false);
   const camera = useRef(null);
   const [dataArr, setDataArr] = useState([]);
-  const [livStreamData, setLiveStreamData] = useState();
-  const [ui, setUI] = useState(false);
   const [selectedGender, setSelectedGender] = useState(0);
   const [genderArr, SetGenderArr] = useState([]);
   const [loadingIndicator, setLoadingIndicator] = useState(false);
   const [buttonTitle, setButtonTitle] = useState('Capture First Video');
-  const [buttonTitleS, setButtonTitleS] = useState('Capture Second Video');;
+  const [buttonTitleS, setButtonTitleS] = useState('Capture Second Video');
   const [isProctering, setProctering] = useState(true);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [isVideoSecondLoading, setIsVideoSecondLoading] = useState(false);
@@ -101,9 +98,6 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
   const [isTaskCompleted, setIsTaskCompleted] = useState(false);
   const [isTaskCompletedSecond, setIsTaskCompletedSecond] = useState(false);
   const [isExamSubmitted, setIsExamSubmitted] = useState(false);
-  const [latitudes, setLatitude] = useState("");
-  const [longitudes, setLongitude] = useState("");
-  const dataLatLong = useSelector((state) => state.basic_reducer.latLong);
   const [tokens, setTokens] = useState();
   const [attemptedQues, setAttemptedQues] = useState(0);
   const [isAttemtDialog, setIsAttemtDialog] = useState(false);
@@ -112,6 +106,8 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
   const isFocused = useIsFocused();
   const [on_off_linemode, setOnOff_lineMode] = useState();
   const [dateTime, setDt] = useState(new Date().toLocaleString());
+  const [loadingOnS3, setLoadingOnS3] = useState(false);
+
 
   useEffect(() => {
     const init = async () => {
@@ -125,7 +121,6 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
     };
     init();
   }, [isFocused]);
-
 
   const requestExternalStoragePermission = async () => {
     try {
@@ -155,13 +150,9 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
       await requestExternalStoragePermission();
       let token = await getData("token");
       setTokens(token);
-      setLatitude(dataLatLong.latitude);
-      setLongitude(dataLatLong.longitude);
     };
     init();
   }, []);
-
-  
 
   useFocusEffect(
     React.useCallback(() => {
@@ -171,7 +162,6 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
         }
         return false; // allow back when exam is submitted
       };
-
       const subscription = BackHandler.addEventListener(
         "hardwareBackPress",
         onBackPress
@@ -218,6 +208,8 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
       " & " +
       longitude;
 
+    console.log("--:timeStamp--", timeStamp)
+
     try {
       switch (option) {
         case 'option1':
@@ -231,10 +223,12 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
         default:
       }
 
+      setLoadingOnS3(true)
       let dataRes = await uploadVideoTagApi(timeStamp, examType, batchIdNo, data?._id, quesId, videopath, tokens);
       console.log('--Geotagging Video Url:--', dataRes.url);
 
       if (dataRes.url === undefined) {
+        setLoadingOnS3(false)
         switch (option) {
           case 'option1':
             setButtonTitle("Capture First Video");
@@ -253,19 +247,21 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
           default:
         }
         SimpleToast.show(
-          "Please check Internet Connection."
+          "Please wait or Please check Internet Connection."
         );
 
       } else {
         switch (option) {
           case 'option1':
             setS3VideoUri(dataRes.url);
+            setLoadingOnS3(false)
             setButtonTitle("First Video Captured");
             setIsUploadingS3(false);
             setIsVideoLoading(false)
             break;
           case 'option2':
             setS3VideoUriSecond(dataRes.url);
+            setLoadingOnS3(false)
             setButtonTitleS("Second Video Captured");
             setIsUploadingSecondS3(false);
             setIsVideoSecondLoading(false);
@@ -276,19 +272,20 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
 
     } catch (error) {
       // console.log("videos Error:--", error);
+      setLoadingOnS3(false)
       switch (option) {
         case 'option1':
           setButtonTitle("Capture First Video");
           setS3VideoUri("");
           setIsUploadingS3(true);
-          setIsTaskCompleted(false)
-          setIsVideoLoading(true)
+          setIsTaskCompleted(false);
+          setIsVideoLoading(false);
           break;
         case 'option2':
           setButtonTitleS("Capture Second Video");
           setS3VideoUriSecond("");
           setIsUploadingSecondS3(true);
-          setIsTaskCompletedSecond(false)
+          setIsTaskCompletedSecond(false);
           setIsVideoSecondLoading(false);
           break;
         default:
@@ -371,10 +368,13 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
           batchIdNo,
           latitude,
           longitude,
+          currentAddress,
+          groupType,
           rtcToken,
           optionF,
           atm_quest,
           dataDetails,
+          positionvrt: position - 1,
         });
 
       }
@@ -387,15 +387,15 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
   const submitApi = async (isFlag, dataArr, position) => {
     let dataJson = {};
 
-    examType == "viva" ?
-      (!isFlag ?
+    if (examType === "viva") {
+      if (!isFlag) {
         dataJson = {
           question: quesId,
           answer: selectedGender,
           remark: remarks,
           final_submit: false,
-        }
-        :
+        };
+      } else {
         dataJson = {
           question: quesId,
           answer: selectedGender,
@@ -409,56 +409,55 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
             video: [s3VideoUri, s3VideoUriSecond],
             mode: Platform.OS + "",
           },
-        }
-      )
-      :
-      (examType == "demo" ?
-        (!isFlag ?
-          dataJson = {
-            question: quesId,
-            answer: selectedGender,
-            remark: remarks,
-            final_submit: false,
-          }
-          :
-          dataJson = {
-            question: quesId,
-            answer: selectedGender,
-            remark: remarks,
-            final_submit: isFlag,
-            user_data: {
-              location: `{lat:${latitude}, lng:${longitude}}`,
-              image: candS3Path,
-              adhaar: idS3Path,
-              image_with_id: candWithIdS3Path,
-              video: [s3VideoUri, s3VideoUriSecond],
-              mode: Platform.OS + "",
-            },
-          }
-        )
-        :
-        (!isFlag ?
-          dataJson = {
-            nos: quesId,
-            marks: selectedGender,
-            final_submit: false,
-          }
-          :
-          dataJson = {
-            nos: quesId,
-            marks: selectedGender,
-            final_submit: isFlag,
-            user_data: {
-              location: `{lat:${latitude}, lng:${longitude}}`,
-              image: candS3Path,
-              adhaar: idS3Path,
-              image_with_id: candWithIdS3Path,
-              video: [s3VideoUri, s3VideoUriSecond],
-              mode: Platform.OS + "",
-            },
-          }
-        )
-      );
+        };
+      }
+    } else if (examType === "demo") {
+      if (!isFlag) {
+        dataJson = {
+          question: quesId,
+          answer: selectedGender,
+          remark: remarks,
+          final_submit: false,
+        };
+      } else {
+        dataJson = {
+          question: quesId,
+          answer: selectedGender,
+          remark: remarks,
+          final_submit: isFlag,
+          user_data: {
+            location: `{lat:${latitude}, lng:${longitude}}`,
+            image: candS3Path,
+            adhaar: idS3Path,
+            image_with_id: candWithIdS3Path,
+            video: [s3VideoUri, s3VideoUriSecond],
+            mode: Platform.OS + "",
+          },
+        };
+      }
+    } else {
+      if (!isFlag) {
+        dataJson = {
+          nos: quesId,
+          marks: selectedGender,
+          final_submit: false,
+        };
+      } else {
+        dataJson = {
+          nos: quesId,
+          marks: selectedGender,
+          final_submit: isFlag,
+          user_data: {
+            location: `{lat:${latitude}, lng:${longitude}}`,
+            image: candS3Path,
+            adhaar: idS3Path,
+            image_with_id: candWithIdS3Path,
+            video: [s3VideoUri, s3VideoUriSecond],
+            mode: Platform.OS + "",
+          },
+        };
+      }
+    }
 
     console.log("--:dataJson --", dataJson)
     let dataRes = await dispatch(postSubmitQuestinApi(examType, assessment_id, data?._id, dataJson));
@@ -467,14 +466,7 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
     if (dataRes.status == 200) {
 
       if (isFlag) {
-        // if (examType == "viva") {
-        //   await updateCandidateListTable(1, data?.cand_id);
-        // } else {
-        //   await updateDemo(1, data?.cand_id);
-        // }
-
         setIsExamSubmitted(true);
-
         // Pop to top to remove this screen from stack, then navigate to TodayAssessment
         navigation.popToTop();
         navigation.navigate("TodayAssessment");
@@ -508,33 +500,10 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
           text: "YES",
           onPress: () => {
             if (atm_quest > 0) {
-              switch (examType) {
-                case 'demo':
-                  submitApi(true, dataArr, position);
-                  break;
-                case 'viva':
-                  submitApi(true, dataArr, position);
-                  break;
-                case 'ojt':
-                  submitApi(true, dataArr, position);
-                  break;
-                default:
-              }
-
+              submitApi(true, dataArr, position);
             } else {
               if (selectedGender > 0) {
-                switch (examType) {
-                  case 'demo':
-                    submitApi(true, dataArr, position);
-                    break;
-                  case 'viva':
-                    submitApi(true, dataArr, position);
-                    break;
-                  case 'ojt':
-                    submitApi(true, dataArr, position);
-                    break;
-                  default:
-                }
+                submitApi(true, dataArr, position);
               } else {
                 SimpleToast.show("Select the marks", 0);
               }
@@ -624,8 +593,8 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
         SetGenderArr(arr);
         setPosition(position - 1);
         setQues(dataArr[position - 2]?.quest);
-        setVRecord(vivaData[position - 2]?.vdrecord)
-        setMesLength(dataArr[position]?.remarks.length);
+        setVRecord(vivaData[position - 2]?.vdrecord);
+        setMesLength(dataArr[position - 2]?.remarks?.length || 0);
         setMaxMarks(dataArr[position - 2]?.max_mark);
         setQuesID(dataArr[position - 2]?.q_id);
         setRemarks(dataArr[position - 2]?.remarks);
@@ -815,6 +784,23 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
 
         </View>
 
+        {/*--:show text when video not upload on S3 justifyContent: 'flex-end'--*/}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 15 }}>
+
+          {on_off_linemode === 'true' ?
+            null
+            :
+            <View style={stylesd.containers}>
+              {isUploadingS3 ? (
+                <>
+                  <Text>Click Upload On S3 button for Upload</Text>
+                </>
+              ) : null}
+              <Text style={styles.textRight}>Click Upload On S3 button for Upload</Text>
+            </View>
+          }
+        </View>
+
         {/* <View style={{ flexDirection: 'row', alignItems: 'center', }}>
           {isVideoLoading ? (
             <>
@@ -990,7 +976,6 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
 
               <View style={styles.rowVi}>
                 <View style={[styles.nextView, { marginLeft: 10 }]}>
-
                   <TouchableOpacity
                     style={{ padding: 3 }}
                     activeOpacity={0.6}
@@ -1054,7 +1039,6 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
               </View>
             </View>
           </ScrollView>
-          {/* <Loader text={AppConfig.PLEASE_WAIT} loading={loadingIndicator} /> */}
 
           <InfoDialog
             item={item}
@@ -1073,6 +1057,12 @@ const StartVivaVideoRecording = ({ navigation, route }) => {
             }}
           />
         </View>
+
+        <CustomLoader
+          visible={loadingOnS3}
+          message="Video uploading on S3..."
+        />
+
       </SafeAreaView>
     </>
   );

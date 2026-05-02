@@ -224,6 +224,11 @@ const dynamicStyles = () => {
       width: "100%",
     },
 
+    textRight: {
+  textAlign: "right",   // 👈 main property
+  fontSize: 14,
+},
+
     viewTrans: {
       backgroundColor: "rgba(255, 255, 255, 1)",
       height: "72%",

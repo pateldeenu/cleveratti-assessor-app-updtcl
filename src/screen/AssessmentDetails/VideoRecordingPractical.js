@@ -4,16 +4,17 @@ import {
   SafeAreaView,
   PermissionsAndroid,
   StyleSheet,
-  Button, FlatList,
-  Alert,
+  FlatList,
   TouchableOpacity,
-  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
+  StatusBar,
 } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { COLORS, FONTS, SIZES } from "../../constants/Theme";
 import normalize from "react-native-normalize";
-import { useDispatch } from "react-redux";
-import Loader from "../../components/Loader";
 import { getDate } from "../../utils/Utills";
 import { AppConfig } from "../AssessmentDetails/Utils";
 import { RNCamera } from 'react-native-camera';
@@ -26,7 +27,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MenuIcon from "../../components/MenuIcon";
 
 const VideoRecordingPractical = ({ navigation, route }) => {
-  const dispatch = useDispatch();
   const {
     data,
     assessment_id,
@@ -39,10 +39,13 @@ const VideoRecordingPractical = ({ navigation, route }) => {
     batchIdNo,
     latitude,
     longitude,
+    currentAddress,
+    groupType,
     rtcToken,
     optionF,
     atm_quest,
-    dataDetails
+    dataDetails,
+    positionvrt,
   } = route.params;
   const [loadingIndicator, setLoadingIndicator] = useState(false);
   const cameraRef = useRef(null);
@@ -55,7 +58,6 @@ const VideoRecordingPractical = ({ navigation, route }) => {
   const [save, setSave] = useState('Save');
   const [progress, setProgress] = useState(0); // Initialize progress as 0
   const [isCompressing, setIsCompressing] = useState(false);
-
 
   useEffect(() => {
     requestExternalStoragePermission();
@@ -123,7 +125,6 @@ const VideoRecordingPractical = ({ navigation, route }) => {
   }, []);
 
   const saveBack = async () => {
-
     navigation.navigate("StartVivaVideoRecording", {
       data,
       assessment_id,
@@ -136,9 +137,12 @@ const VideoRecordingPractical = ({ navigation, route }) => {
       batchIdNo,
       latitude,
       longitude,
+      currentAddress,
+      groupType,
       rtcToken,
       atm_quest,
       dataDetails,
+      positionvrt,
     });
   }
 
@@ -152,36 +156,24 @@ const VideoRecordingPractical = ({ navigation, route }) => {
           quality: '4:3', // Adjust quality as needed
         };
 
-        await cameraRef.current.recordAsync(options)
-          .then(({ uri }) => {
-            const folderPath = 'file://' + RNFS.ExternalDirectoryPath;
-
-            return RNFS.mkdir(folderPath)
-              .then(() => {
-                const videoName = `video_${Date.now()}.mp4`;
-                const newPath = `${folderPath}/${videoName}`;
-                return RNFS.moveFile(uri, newPath)
-                  .then(() => {
-                    setButtonTitle("Recording Completed")
-                    // console.log('Video saved:', newPath);
-                    stopRecording();
-                    setIsRunning(false);
-                    captureVideos(newPath)
-                  })
-                  .catch(error => {
-
-                  });
-              })
-              .then(() => {
-                // console.log('Video saved successfully.');
-              })
-              .catch(error => {
-
-              });
-          })
-          .catch(error => {
-            SimpleToast.show(`Camera not running Close Camera & Re-Open`);
-          })
+        try {
+          const { uri } = await cameraRef.current.recordAsync(options);
+          const folderPath = 'file://' + RNFS.ExternalDirectoryPath;
+          await RNFS.mkdir(folderPath);
+          const videoName = `video_${Date.now()}.mp4`;
+          const newPath = `${folderPath}/${videoName}`;
+          try {
+            await RNFS.moveFile(uri, newPath);
+            setButtonTitle("Recording Completed");
+            stopRecording();
+            setIsRunning(false);
+            captureVideos(newPath);
+          } catch (moveError) {
+            // move failed silently
+          }
+        } catch (recordError) {
+          SimpleToast.show(`Camera not running Close Camera & Re-Open`);
+        }
       } catch (error) {
         setIsRecording(false);
       }
@@ -221,8 +213,8 @@ const VideoRecordingPractical = ({ navigation, route }) => {
     moveImageToDirectoryCompVideos(compressedUri, targetDirectory);
   };
 
-  //Save Image timeStamp wise In Internal folder 
-  const moveImageToDirectoryCompVideos = (filePath, targetDirectory) => {
+  //Save Image timeStamp wise In Internal folder
+  const moveImageToDirectoryCompVideos = async (filePath, targetDirectory) => {
     const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
     const fileNametwo = `${batchIdNo}_${getDate()}_${fileName}`;
     const targetFilePath = `${targetDirectory}/${fileNametwo}`;
@@ -233,9 +225,9 @@ const VideoRecordingPractical = ({ navigation, route }) => {
       getCaptureVideosPathSecond(targetFilePath);
     }
 
-    return RNFS.mkdir(targetDirectory)
-      .then(() => RNFS.moveFile(filePath, targetFilePath))
-      .then(() => targetFilePath);
+    await RNFS.mkdir(targetDirectory);
+    await RNFS.moveFile(filePath, targetFilePath);
+    return targetFilePath;
   };
 
   const getCaptureVideosPath = async (videopath) => {
@@ -251,27 +243,25 @@ const VideoRecordingPractical = ({ navigation, route }) => {
     moveImageToDirectoryWithoutCompress(video_uri, targetDirectory);
   };
 
-  //Save Image timeStamp wise In Internal folder 
-  const moveImageToDirectoryWithoutCompress = (filePath, targetDirectory) => {
+  //Save Image timeStamp wise In Internal folder
+  const moveImageToDirectoryWithoutCompress = async (filePath, targetDirectory) => {
     const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
     const targetFilePath = `${targetDirectory}/${fileName}`;
     //console.log('Without Compress Videos saved to directory:', targetFilePath);
-    return RNFS.mkdir(targetDirectory)
-      .then(() => {
-        return RNFS.moveFile(filePath, targetFilePath)
-          .then(() => {
-            (targetFilePath);
-            setTimeout(() => {
-              compressVideo(targetFilePath);
-            }, 1000);
-          })
-          .catch(error => {
-          });
-      })
-      .then(() => {
-      })
-      .catch(error => {
-      });
+    try {
+      await RNFS.mkdir(targetDirectory);
+      try {
+        await RNFS.moveFile(filePath, targetFilePath);
+        (targetFilePath);
+        setTimeout(() => {
+          compressVideo(targetFilePath);
+        }, 1000);
+      } catch (moveError) {
+        // move failed silently
+      }
+    } catch (mkdirError) {
+      // mkdir failed silently
+    }
   };
 
   const stopRecording = () => {
@@ -294,219 +284,434 @@ const VideoRecordingPractical = ({ navigation, route }) => {
   );
 
   return (
-    <>
-      <SafeAreaView style={styles.constainer}>
-        <KeyboardAvoidingView style={styles.constainer}>
-          <View style={styles.constainer}>
-            <View style={styles.viewMargin}>
-              <MenuIcon
-                onPress={() => {
-                  backWithoutRequired()
-                }}
-                back="back" />
-              <Text style={styles.ques}>{"Record  video offline"}</Text>
-            </View>
+    <SafeAreaView style={styles.container}>
+      {/* ── Fixed Header ── */}
+      <View style={styles.header}>
+        <MenuIcon
+          onPress={() => {
+            backWithoutRequired()
+          }}
+          back="back" />
+        <Text style={styles.title}>Record Video Offline</Text>
+        <View style={styles.headerEnd} />
+      </View>
 
-            <View style={styles.grpcontainer}>
-              <FlatList
-                data={vivaData}
-                keyExtractor={(item) => item.q_id}
-                renderItem={rendervbItem}
-              // style={styles.flatList}
-              />
-            </View>
+      {/* ── Questions (scrollable, max height so camera still shows) ── */}
+      <View style={styles.grpcontainer}>
+        <FlatList
+          data={vivaData}
+           keyExtractor={(item) => item.q_id}
+           renderItem={rendervbItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 4 }}
+        />
+      </View>
 
-            <View style={{ flex: 1 }}>
-              <RNCamera
-                ref={cameraRef}
-                style={{ flex: 1 }}
-                type={RNCamera.Constants.Type.back}
-                captureAudio={true}
-
-                // playSoundOnRecord={false}
-                flashMode={RNCamera.Constants.FlashMode.auto}
-                // path={`${RNFS.DocumentDirectoryPath}/myVideos/video.mp4`}
-                // defaultVideoQuality={RNCamera.Constants.VideoQuality["4:3"]}
-                defaultVideoQuality={RNCamera.Constants.VideoQuality['low']}
-                // quality={RNCamera.Constants.VideoQuality['320p']}
-                // maxFileSize={20 * 1024 * 1024}
-                // quality={RNCamera.Constants.VideoQuality['1080p']}
-                androidCameraPermissionOptions={{
-                  title: "Permission to use camera",
-                  message: "We need your permission to use your camera",
-                  buttonPositive: "Ok",
-                  buttonNegative: "Cancel",
-                }}
-                androidRecordAudioPermissionOptions={{
-                  title: "Permission to use audio recording",
-                  message: "We need your permission to use your audio",
-                  buttonPositive: "Ok",
-                  buttonNegative: "Cancel",
-                }}
-
-              />
-
-              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20, }}>
-                {isCompressing ? (
-
-                  <View style={{ width: '80%' }}>
-                    <Text style={{ marginBottom: 10, }}>Please wait Capture Video is Compressing ...</Text>
-                    <ProgressBar progress={progress} width={null} />
-                    <Text>{Math.round(progress * 100)}%</Text>
-                  </View>
-                ) : (
-                  null
-                  // <Button title="Compress Video" onPress={compressVideo} />
-                )}
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 20, }}>
-
-                <Text style={styles.textLeft}>Timer:-{formatTime(timer)}</Text>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    if (isRecording) {
-                      stopRecording();
-                      // onClose();
-                    } else {
-                      startRecording();
-                      setIsRecording(true);
-                    }
-                  }}
-                  style={{
-                    backgroundColor: isRecording ? 'blue' : 'green',
-                    padding: 10,
-                    fontSize: 8,
-                    borderRadius: 10,
-                    flex: 1,
-                    margin: 5,
-                    justifyContent: 'center',
-                    textAlign: 'center',
-
-                  }}>
-                  {/* <Text style={{ color: 'white' }}>{isRecording ? 'recording' : 'Start Record'}</Text> */}
-                  <Text style={{ color: 'white', textAlign: 'center' }}>{buttonTitle}</Text>
-                </TouchableOpacity>
-
-                <View style={{
-                  flex: 1,
-                  textAlign: 'right',
-                }}>
-
-                  {isTaskCompleted ? (
-                    <View style={{
-                      flex: 1,
-                    }}>
-                      <TouchableOpacity
-                        onPress={saveBack}
-                        style={{
-                          backgroundColor: 'green',
-                          padding: 10,
-                          margin: 5,
-                          justifyContent: 'center',
-                          borderRadius: 10,
-                          flex: 1,
-                          textAlign: 'right',
-                        }}>
-                        <Text style={{ color: 'white', textAlign: 'center', }}>{save}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    // <Text>Task null</Text>
-                    null
-                    // <Button title="Complete Task" onPress={completeTask} />
-                  )}
-                </View>
-              </View>
-            </View>
-            <Loader text={AppConfig.PLEASE_WAIT_COMPRESS + " " + progress} loading={loadingIndicator} />
+      {/* ── Camera fills remaining space ── */}
+      <View style={styles.cameraWrapper}>
+        <RNCamera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          type={RNCamera.Constants.Type.back}
+          captureAudio
+          androidCameraPermissionOptions={{
+            title: "Camera Permission",
+            message: "App needs access to your camera",
+            buttonPositive: "OK",
+            buttonNegative: "Cancel",
+          }}
+          androidRecordAudioPermissionOptions={{
+            title: "Microphone Permission",
+            message: "App needs access to your microphone",
+            buttonPositive: "OK",
+            buttonNegative: "Cancel",
+          }}
+        />
+        {isRecording && (
+          <View style={styles.recBadge}>
+            <View style={styles.recDot} />
+            <Text style={styles.recBadgeText}>REC</Text>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </>
+        )}
+      </View>
+
+      {/* ── Bottom panel: compressing OR controls — never overlaps camera ── */}
+      <View style={styles.bottomPanel}>
+
+        {isCompressing ? (
+          /* Compressing state */
+          <View style={styles.compressBox}>
+            <Text style={styles.compressLabel}>Compressing video, please wait...</Text>
+            <ProgressBar
+              progress={progress}
+              width={null}
+              color="#1565C0"
+              borderRadius={6}
+              height={normalize(10)}
+            />
+            <Text style={styles.compressPercent}>{Math.round(progress * 100)}%</Text>
+          </View>
+        ) : (
+          /* Timer + action button row */
+          <View style={styles.controlsRow}>
+            <View style={styles.timerBox}>
+              <Text style={styles.timerValue}>{formatTime(timer)}</Text>
+              <Text style={styles.timerLabel}>Timer</Text>
+            </View>
+
+            {isTaskCompleted ? (
+              <TouchableOpacity style={styles.saveBtn} onPress={saveBack}>
+                <Text style={styles.btnText}>Save</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionBtn, isRecording && styles.actionBtnStop]}
+                onPress={() => (isRecording ? stopRecording() : startRecording())}
+              >
+                <Text style={styles.btnText}>
+                  {buttonTitle}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+
+    </SafeAreaView>
   );
 };
 
+const BASE_FONT = SCREEN_WIDTH < 360 ? 13 : 15;
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0;
+
+// const styles = StyleSheet.create({
+//   safeArea: {
+//     flex: 1,
+//     backgroundColor: COLORS.bgBlueColor,
+//   },
+//   flex1: {
+//     flex: 1,
+//   },
+
+//   /* Header — top padding clears the status bar on every Android version */
+//   header: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     backgroundColor: COLORS.bgBlueColor,
+//     paddingTop: STATUS_BAR_HEIGHT + 8,
+//     paddingBottom: 10,
+//     paddingHorizontal: 8,
+//     minHeight: 56 + STATUS_BAR_HEIGHT,
+//   },
+//   backButton: {
+//     justifyContent: 'center',
+//     alignItems: 'flex-start',
+//   },
+//   headerTitle: {
+//     flex: 1,
+//     textAlign: 'center',
+//     fontWeight: 'bold',
+//     fontSize: normalize(17),
+//     color: COLORS.black,
+//     ...FONTS.h2,
+//   },
+//   headerRight: {
+//     width: 44,
+//   },
+
+//   /* Questions */
+//   questionsContainer: {
+//     maxHeight: SCREEN_HEIGHT * 0.18,
+//     paddingHorizontal: 12,
+//     paddingBottom: 6,
+//   },
+//   itemContainer: {
+//     flexDirection: 'row',
+//     marginBottom: 6,
+//     paddingRight: 4,
+//   },
+//   index: {
+//     fontSize: BASE_FONT,
+//     marginRight: 6,
+//     color: COLORS.black,
+//   },
+//   text: {
+//     flex: 1,
+//     fontSize: BASE_FONT,
+//     color: COLORS.black,
+//     lineHeight: BASE_FONT * 1.4,
+//   },
+
+//   /* Camera */
+//   cameraContainer: {
+//     flex: 1,
+//     overflow: 'hidden',
+//   },
+//   camera: {
+//     flex: 1,
+//   },
+
+//   /* Bottom card — white surface that holds compress + buttons */
+//   bottomCard: {
+//     backgroundColor: '#FFFFFF',
+//     elevation: 12,
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: -3 },
+//     shadowOpacity: 0.15,
+//     shadowRadius: 6,
+//     borderTopLeftRadius: 16,
+//     borderTopRightRadius: 16,
+//     paddingTop: 10,
+//     paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+//   },
+
+//   /* Compress progress (inside bottomCard) */
+//   progressContainer: {
+//     paddingHorizontal: 16,
+//     paddingBottom: 10,
+//     borderBottomWidth: 1,
+//     borderBottomColor: 'rgba(0,0,0,0.07)',
+//     marginBottom: 6,
+//   },
+//   progressHeader: {
+//     flexDirection: 'row',
+//     justifyContent: 'space-between',
+//     alignItems: 'center',
+//     marginBottom: 6,
+//   },
+//   progressLabel: {
+//     fontSize: normalize(12),
+//     color: '#444',
+//     fontWeight: '500',
+//   },
+//   progressPercent: {
+//     fontSize: normalize(12),
+//     color: '#2E7D32',
+//     fontWeight: '700',
+//   },
+
+//   /* Button row */
+//   bottomBar: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     paddingHorizontal: 12,
+//     paddingTop: 4,
+//   },
+//   timerWrapper: {
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     minWidth: 68,
+//     marginRight: 8,
+//     backgroundColor: '#F0F4FF',
+//     borderRadius: 10,
+//     paddingVertical: 8,
+//     paddingHorizontal: 6,
+//   },
+//   timerLabel: {
+//     fontSize: normalize(10),
+//     color: '#666',
+//     marginBottom: 2,
+//   },
+//   timerValue: {
+//     fontSize: normalize(16),
+//     fontWeight: 'bold',
+//     color: '#1A237E',
+//   },
+//   actionButton: {
+//     flex: 1,
+//     minHeight: 50,
+//     borderRadius: 12,
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//     marginHorizontal: 4,
+//     elevation: 3,
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: 2 },
+//     shadowOpacity: 0.2,
+//     shadowRadius: 3,
+//   },
+//   saveButton: {
+//     backgroundColor: '#2E7D32',
+//   },
+//   actionButtonPlaceholder: {
+//     flex: 1,
+//     marginHorizontal: 4,
+//   },
+//   actionButtonText: {
+//     color: '#fff',
+//     fontWeight: '700',
+//     fontSize: normalize(14),
+//     textAlign: 'center',
+//     letterSpacing: 0.3,
+//   },
+
+//   /* legacy — kept to avoid import errors elsewhere */
+//   constainer: {
+//     width: '100%',
+//     backgroundColor: COLORS.bgBlueColor,
+//     flex: 1,
+//   },
+// });
+
 const styles = StyleSheet.create({
-  constainer: {
-    width: "100%",
-    backgroundColor: COLORS.bgBlueColor,
-    flex: 1,
-  },
-  ques: {
-    fontWeight: "bold",
-    fontSize: normalize(18),
-    color: COLORS.black,
-    ...FONTS.h2,
-    alignSelf: "center",
-    justifyContent: "center",
-    width: "70%",
-    textAlign: "center",
-  },
-  viewMargin: {
-    marginTop: 10,
-    marginBottom: 10,
-    flexDirection: "row",
-    backgroundColor: COLORS.bgBlueColor,
-  },
-
-  viewStyle: {
-    backgroundColor: COLORS.white,
-    paddingTop: 20,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-    marginTop: 25,
-    flexGrow: 1,
-  },
-  row: {
-    flexDirection: "row",
-    marginHorizontal: 40,
-  },
-
   container: {
-    height: 45,
-    borderRadius: 14,
-    marginHorizontal: SIZES.padding,
-    backgroundColor: COLORS.blue,
-    marginVertical: 10,
-    paddingHorizontal: 60,
-    justifyContent: "center",
+    flex: 1,
+    //backgroundColor: "#000",
+    backgroundColor: COLORS.bgBlueColor,
+  },
+
+  /* Header */
+  header: {
+    flexDirection: "row",
     alignItems: "center",
+    backgroundColor: COLORS.bgBlueColor,
+    paddingVertical: normalize(6),
+    paddingHorizontal: normalize(4),
+    marginTop: normalize(30),
+    minHeight: normalize(48),
+  },
+  title: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: normalize(16),
+    fontWeight: "bold",
+    color: "#000",
+  },
+  headerEnd: {
+    width: normalize(40),
   },
 
-  textLeft: {
-    flex: 1,
-    textAlign: 'left',
-    marginLeft: 5,
-  },
-  textCenter: {
-    flex: 1,
-    textAlign: 'center',
-  },
-  textRight: {
-    flex: 1,
-    textAlign: 'right',
-  },
-
+  /* Questions */
   grpcontainer: {
-    height: 100, // 🔒 Fixed height here
-    padding: 10,
+    backgroundColor: COLORS.bgBlueColor,
+    maxHeight: normalize(140),
+    paddingHorizontal: normalize(14),
+    paddingTop: normalize(10),
+    paddingBottom: normalize(6),
   },
-
   itemContainer: {
-    flexDirection: 'row',
-    marginBottom: 12,
+    flexDirection: "row",
+    marginBottom: normalize(5),
+    alignItems: "flex-start",
   },
   index: {
-    fontSize: 11,
-    //fontWeight: 'bold',
-    marginRight: 6,
+    fontSize: normalize(12),
+    fontWeight: "600",
+    color: "#1A237E",
+    marginRight: normalize(4),
+    lineHeight: normalize(18),
   },
   text: {
     flex: 1,
-    fontSize: 11,
+    fontSize: normalize(12),
+    color: "#1A1A1A",
+    lineHeight: normalize(18),
   },
 
+  /* Camera */
+  cameraWrapper: {
+    flex: 1,
+    backgroundColor: "#000",
+    overflow: "hidden",
+  },
+  recBadge: {
+    position: "absolute",
+    top: normalize(10),
+    right: normalize(10),
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: normalize(8),
+    paddingVertical: normalize(4),
+    borderRadius: normalize(12),
+  },
+  recDot: {
+    width: normalize(8),
+    height: normalize(8),
+    borderRadius: normalize(4),
+    backgroundColor: "red",
+    marginRight: normalize(5),
+  },
+  recBadgeText: {
+    color: "#fff",
+    fontSize: normalize(11),
+    fontWeight: "bold",
+  },
+
+  /* Bottom panel */
+  bottomPanel: {
+    backgroundColor: COLORS.bgBlueColor,
+    paddingHorizontal: normalize(14),
+    paddingVertical: normalize(12),
+    paddingBottom: normalize(30),
+    minHeight: normalize(140),
+    justifyContent: "center",
+  },
+
+  /* Controls row */
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  timerBox: {
+    alignItems: "center",
+    marginRight: normalize(12),
+    minWidth: normalize(56),
+  },
+  timerValue: {
+    fontSize: normalize(22),
+    fontWeight: "bold",
+    color: "#1A237E",
+  },
+  timerLabel: {
+    fontSize: normalize(10),
+    color: "#555",
+    marginTop: normalize(1),
+  },
+  actionBtn: {
+    flex: 1,
+    backgroundColor: "#2E7D32",
+    paddingVertical: normalize(14),
+    borderRadius: normalize(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionBtnStop: {
+    backgroundColor: "#C62828",
+  },
+  saveBtn: {
+    flex: 1,
+    backgroundColor: "#1565C0",
+    paddingVertical: normalize(14),
+    borderRadius: normalize(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnText: {
+    color: "#fff",
+    fontSize: normalize(14),
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  /* Compression panel */
+  compressBox: {
+    paddingHorizontal: normalize(4),
+  },
+  compressLabel: {
+    fontSize: normalize(13),
+    color: "#1A1A1A",
+    fontWeight: "500",
+    marginBottom: normalize(8),
+    textAlign: "center",
+  },
+  compressPercent: {
+    fontSize: normalize(12),
+    color: "#1565C0",
+    textAlign: "right",
+    marginTop: normalize(4),
+    fontWeight: "600",
+  },
 });
 
 export default VideoRecordingPractical;

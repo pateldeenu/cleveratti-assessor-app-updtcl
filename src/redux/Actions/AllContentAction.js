@@ -445,8 +445,8 @@ export const getLiveStreamingApi = (candId, type) => (dispatch) => {
         url: finalUrl,
         method: "POST",
         data: {
-          channel: candId,   // 👈 check if backend requires channel
-          role: type,        // 👈 optional, if backend requires role
+          channel: candId,
+          role: type,
         },
         onSuccess: (response) => {
           console.log("Agora token response:", response);

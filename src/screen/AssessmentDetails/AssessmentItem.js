@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useState } from "react";
-import { TouchableOpacity, View, StyleSheet, Text } from "react-native";
+import { TouchableOpacity, View, StyleSheet, Text, Alert } from "react-native";
 import CheckBox from "@react-native-community/checkbox";
 import normalize from "react-native-normalize";
 import { CustomeButton } from "../../components";
@@ -47,9 +47,9 @@ const AssessmentItem = ({
   //console.log("--:ojtCount--", ojtCount)
   //console.log("--:demoCount--", demoCount)
 
-   //console.log("--:isDemo--", isDemo)
-  //  console.log("--:isViva--", isViva)
-  //  console.log("--:isOjt--", isOjt)
+   console.log("--:isDemo--", isDemo)
+   console.log("--:isViva--", isViva)
+   console.log("--:isOjt--", isOjt)
 
   // console.log("--:groupType--", groupType)
 
@@ -385,6 +385,10 @@ const AssessmentItem = ({
                     },
                   ]}
                   onPress={() => {
+
+                    // {console.log("--:click geotagging--")}
+                    // navigation.navigate("GeoTaggedVideoRecorder")
+
                     navigation.navigate("AssessmentInstructions", {
                       dataDetails,
                       data,

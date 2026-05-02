@@ -1,5 +1,5 @@
 import { View, Text, SafeAreaView, StyleSheet, FlatList, ActivityIndicator } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { COLORS, FONTS } from "../../constants/Theme";
 import { SearchComponent } from "../../components";
 import MenuIcon from "../../components/MenuIcon";
@@ -12,12 +12,22 @@ import normalize from "react-native-normalize";
 import SimpleToast from "react-native-simple-toast";
 import { createAssess_batchTable, db, insertAssbatchTable, } from "../../database/SqlLitedatabase";
 import { AppConfig } from "../AssessmentDetails/Utils";
+import NetInfo from "@react-native-community/netinfo";
 
 const TodayAssessment = ({ navigation }) => {
   const dispatch = useDispatch();
   const [loadingIndicator, setLoadingIndicator] = useState(false);
   const [todayass_batchListDb, setDatatodayAssbatchDb] = useState([]);
   const DemoButtonStatus = true;
+  const hasFetchedFromApi = useRef(false);
+  const [isConnected, setIsConnected] = useState(true);
+  const wasOfflineRef = useRef(false);
+  const dataLengthRef = useRef(0);
+
+  // keep dataLengthRef in sync to avoid stale closure in NetInfo listener
+  useEffect(() => {
+    dataLengthRef.current = todayass_batchListDb.length;
+  }, [todayass_batchListDb]);
 
   // ✅ Run only once on mount
   useEffect(() => {
@@ -26,6 +36,31 @@ const TodayAssessment = ({ navigation }) => {
       await deleteDemoVideosPath();
     };
     init();
+  }, []);
+
+  // network monitor — show banner when offline, auto-retry when reconnected
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const connected = state.isConnected && state.isInternetReachable !== false;
+
+      if (!connected) {
+        wasOfflineRef.current = true;
+        setIsConnected(false);
+        SimpleToast.show("No Internet Connection.");
+      } else {
+        setIsConnected(true);
+        if (wasOfflineRef.current) {
+          wasOfflineRef.current = false;
+          SimpleToast.show("Connected. Refreshing data...");
+          if (dataLengthRef.current === 0) {
+            hasFetchedFromApi.current = false;
+          }
+          fetchassessbatchTabl();
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const formatCandidateKyc = (candidateKyc) => {
@@ -84,8 +119,11 @@ const TodayAssessment = ({ navigation }) => {
         if (temp.length > 0) {
           setDatatodayAssbatchDb(temp);
           setLoadingIndicator(false);
-        } else {
+        } else if (!hasFetchedFromApi.current) {
+          hasFetchedFromApi.current = true;
           getAssessmentBatchApi();
+        } else {
+          setLoadingIndicator(false);
         }
       });
     });
@@ -112,6 +150,12 @@ const TodayAssessment = ({ navigation }) => {
             onChangeText={onChangeText}
           />
         </View>
+        {!isConnected && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>No Internet Connection</Text>
+          </View>
+        )}
+
         <View style={styles.viewStyle}>
           <View style={{ alignItems: "center" }}>
             <Text style={[{ ...FONTS.h3 }, styles.text]}>
@@ -198,6 +242,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loaderText: {
+    marginTop: 8,
+    color: COLORS.bluecolrHead,
+    fontSize: normalize(14),
+  },
+  offlineBanner: {
+    backgroundColor: "#e53935",
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  offlineBannerText: {
+    color: "#fff",
+    fontSize: normalize(13),
+    fontWeight: "600",
   },
   viewMargin: {
     marginTop: 10,

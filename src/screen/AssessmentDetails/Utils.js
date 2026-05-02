@@ -269,6 +269,7 @@ export const DEMO_OPTIONS_1 = [
   "19",
   "20",
 ];
+
 export const DEMO_OPTIONS_Lang = [
   // "Hindi",
   "English",
@@ -301,8 +302,7 @@ export function isValidURL(string) {
 
 const AppConfig = {
 
-  
-  _id: '_id',
+
   Parent_Name: "Parent Name",
   STUDENT_NAME: "Student Name",
   ATTEMPT: "Attempt",
@@ -364,7 +364,6 @@ const ConfigColor = {
   white: "#FFFFFF",
   pinkColor: "#C74171",
   fontSize: 9
-
 };
 
 export { AppConfig, ConfigColor, formatAMPM };

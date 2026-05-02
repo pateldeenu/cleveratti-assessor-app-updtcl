@@ -9,6 +9,7 @@ import {
   ScrollView,
   BackHandler,
   Alert,
+  ActivityIndicator,
   PermissionsAndroid,
 } from "react-native";
 import { COLORS } from "../../constants/Theme";
@@ -46,47 +47,6 @@ import SimpleToast from "react-native-simple-toast";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from '@react-navigation/native';
 
-
-export const requestLocationPermissionOnAndroid = async () => {
-  try {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-      {
-        title: "Alert",
-        message:
-          "Turning on location services allows us to show your distance from other users when browsing matches, and allows other users to see their distance from you.",
-        buttonPositive: "OKAY",
-      }
-    );
-
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-  } catch (error) {
-    throw error;
-  }
-};
-
-export const requestLocationPermissionOnIOS = async () => {
-  try {
-    // Using react-native-permissions recommended approach:
-    const res = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-    return res === RESULTS.GRANTED;
-  } catch (error) {
-    throw error;
-  }
-};
-
-export const enableGPSOnAndroid = async () => {
-  try {
-    const response = await RNAndroidLocationEnabler.promptForEnableLocationIfNeeded({
-      interval: 10000,
-      fastInterval: 5000,
-    });
-    return response === "already-enabled" || response === "enabled";
-  } catch (error) {
-    return false;
-  }
-};
-
 const AssessmentInstructions = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const isMountedRef = useRef(true);
@@ -122,7 +82,8 @@ const AssessmentInstructions = ({ navigation, route }) => {
   const [currentAddress, setCurrentAddress] = useState("");
   const [orientation, setOrientation] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
-
+  const [loadingApi, setLoadingApi] = useState(false);
+  
   // safe mount/unmount handling
   useEffect(() => {
     isMountedRef.current = true;
@@ -177,11 +138,9 @@ const AssessmentInstructions = ({ navigation, route }) => {
           console.log("Error in useFocusEffect fetchLocation:", err);
         }
       };
-
       if (isActive) {
         loadLocation();
       }
-
       return () => {
         isActive = false; // cleanup
       };
@@ -754,16 +713,11 @@ const AssessmentInstructions = ({ navigation, route }) => {
                       });
                     } else {
                       try {
-                        console.log("--:StartVivaVideoRecording--")
                         await getCaptureVideosPath();
+                        setLoadingApi(true);
                         const resv = await dispatch(getLiveStreamingApi(data?._id, "publisher"));
-                        // const rtcToken = resv?.data?.rtcToken;
-                        console.log("--:resv--",resv)
-
+                        setLoadingApi(false);
                         const rtcToken = resv?.data?.rtcToken;
-                        console.log("--:rtcToken last--",rtcToken)
-
-
                         navigation.navigate("StartVivaVideoRecording", {
                           rtcToken,
                           data,
@@ -784,6 +738,7 @@ const AssessmentInstructions = ({ navigation, route }) => {
                           positionvrt: "0",
                         });
                       } catch (err) {
+                        setLoadingApi(false);
                         SimpleToast.show("Unable to start live streaming.");
                       }
                     }
@@ -818,6 +773,24 @@ const AssessmentInstructions = ({ navigation, route }) => {
           onPress={() => setIsPhotoViewerVisibleScreenShot(false)}
         />
       </ScrollView>
+
+         {loadingIndicator && (
+                <View style={styles.loaderOverlay}>
+                  <View style={styles.loaderBox}>
+                    <ActivityIndicator size="large" color="#1E88E5" />
+                    <Text style={styles.loaderText}>Please Uploading image...</Text>
+                  </View>
+                </View>
+              )}
+      
+              {loadingApi && (
+                <View style={styles.loaderOverlay}>
+                  <View style={styles.loaderBox}>
+                    <ActivityIndicator size="large" color="#1E88E5" />
+                    <Text style={styles.loaderText}>Loading, please wait.....</Text>
+                  </View>
+                </View>
+              )}
     </SafeAreaView>
   );
 };
@@ -997,6 +970,32 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
     fontSize: 10,
+  },
+
+  ///
+  loaderOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+
+  loaderBox: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  loaderText: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 

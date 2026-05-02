@@ -34,6 +34,7 @@ import UploadBatches from "../screen/Audit/UploadBatches";
 import VideoRecording from "../screen/Audit/VideoRecording";
 import StartRubricDemo from "../screen/AssessmentDetails/StartRubricDemo";
 import StartVivaVideoRecording from "../screen/AssessmentDetails/StartVivaVideoRecording";
+import GeoTaggedVideoRecorder from "../screen/AssessmentDetails/GeoTaggedVideoRecorder";
 import VideoRecordingPractical from "../screen/AssessmentDetails/VideoRecordingPractical";
 import VideoRecordingDemoPract from "../screen/AssessmentDetails/VideoRecordingDemoPract";
 import Room from "../screen/Audit/WebRtcRoom";
@@ -81,6 +82,7 @@ function StackNavigationScreens() {
       <Stack.Screen name="AuditBatchList" component={AuditBatchListScreen} />
       <Stack.Screen name="VideoRecording" component={VideoRecording} />
       <Stack.Screen name="StartVivaVideoRecording" component={StartVivaVideoRecording} />
+      <Stack.Screen name="GeoTaggedVideoRecorder" component={GeoTaggedVideoRecorder}/>
       <Stack.Screen name="UploadBatches" component={UploadBatches} />
       <Stack.Screen name="VideoRecordingPractical" component={VideoRecordingPractical} />
       <Stack.Screen name="VideoRecordingDemoPract" component={VideoRecordingDemoPract} />
